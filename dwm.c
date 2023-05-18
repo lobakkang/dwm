@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
+#include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -1518,46 +1520,150 @@ void restack(Monitor *m) {
     ;
 }
 
-FILE *file;
-int lol = 0;
 pthread_t thread;
 volatile int thread_state = 0;
-void *myFunction(void *) {
-  // drawbars();
-  //  updatestatus();
-  time_t lastUpdateTime = time(NULL);
-  while (thread_state == 0) {
-    time_t currentTime = time(NULL);
-    double elapsedTime = difftime(currentTime, lastUpdateTime);
-    if (elapsedTime >= 1.0) {
-      lastUpdateTime = currentTime;
-      lol++;
-      snprintf(stext, sizeof(stext), "󰋊 %d", lol);
-      fprintf(file, "lol: %d\n", lol);
-      fflush(file);
-      drawbars();
-      usleep(1000000);
-    }
+
+float getCpuUsage() {
+  FILE *statFile = fopen("/proc/stat", "r");
+  if (statFile) {
+    unsigned long long int user, nice, system, idle, iowait, irq, softirq;
+    fscanf(statFile, "cpu %llu %llu %llu %llu %llu %llu %llu", &user, &nice,
+           &system, &idle, &iowait, &irq, &softirq);
+    fclose(statFile);
+    unsigned long long int total =
+        user + nice + system + idle + iowait + irq + softirq;
+    unsigned long long int nonIdle = user + nice + system;
+    return (nonIdle * 100.0) / total; // Calculate the CPU usage percentage
   }
-  fprintf(file, "haha ending\n");
-  fflush(file);
+  fclose(statFile);
+  return -1.0; // Error: Unable to get CPU usage
+}
+
+#define BAT_LEVEL_PATH "/sys/class/power_supply/BAT0/capacity"
+#define BAT_STATUS_PATH "/sys/class/power_supply/BAT0/status"
+#define TEMP_PATH "/sys/class/thermal/thermal_zone0/temp"
+
+void *myFunction(void *) {
+  int batteryLevel;
+  int temp;
+  char buffer[256];
+  unsigned int user1;   // 定义一个无符号的int类型的user
+  unsigned int nice1;   // 定义一个无符号的int类型的nice
+  unsigned int system1; // 定义一个无符号的int类型的system
+  unsigned int idle1;   // 定义一个无符号的int类型的idle
+  unsigned int lowait1;
+  unsigned int irq1;
+  unsigned int softirq1;
+  unsigned int user2;   // 定义一个无符号的int类型的user
+  unsigned int nice2;   // 定义一个无符号的int类型的nice
+  unsigned int system2; // 定义一个无符号的int类型的system
+  unsigned int idle2;   // 定义一个无符号的int类型的idle
+  unsigned int lowait2;
+  unsigned int irq2;
+  unsigned int softirq2;
+  while (thread_state == 0) {
+    FILE *file = fopen(BAT_LEVEL_PATH, "r");
+    fscanf(file, "%d", &batteryLevel);
+    fclose(file);
+    file = fopen(TEMP_PATH, "r");
+    fscanf(file, "%d", &temp);
+    fclose(file);
+    file = fopen(BAT_STATUS_PATH, "r");
+    fscanf(file, "%s", buffer);
+    fclose(file);
+
+    char *bat_icon = "󰂅";
+    if (strstr(buffer, "Charging") != NULL) {
+      bat_icon = "󰚥";
+    } else if (strstr(buffer, "Not") != NULL) {
+      bat_icon = "󰁹";
+    }
+
+    unsigned long used_memory;
+    file = fopen("/proc/meminfo", "r");
+
+    char buffer[256];
+    unsigned long total_memory = 0;
+    unsigned long free_memory = 0;
+    unsigned long claim_memory = 0;
+    unsigned long shared_memory = 0;
+    unsigned long buffers = 0;
+    unsigned long cached = 0;
+
+    while (fgets(buffer, sizeof(buffer), file)) {
+      if (strncmp(buffer, "MemTotal:", 9) == 0) {
+        sscanf(buffer, "MemTotal: %lu", &total_memory);
+      } else if (strncmp(buffer, "SReclaimable:", 13) == 0) {
+        sscanf(buffer, "SReclaimable: %lu", &claim_memory);
+      } else if (strncmp(buffer, "Shmem:", 6) == 0) {
+        sscanf(buffer, "Shmem: %lu", &shared_memory);
+      } else if (strncmp(buffer, "MemFree:", 8) == 0) {
+        sscanf(buffer, "MemFree: %lu", &free_memory);
+      } else if (strncmp(buffer, "Buffers:", 8) == 0) {
+        sscanf(buffer, "Buffers: %lu", &buffers);
+      } else if (strncmp(buffer, "Cached:", 7) == 0) {
+        sscanf(buffer, "Cached: %lu", &cached);
+      }
+    }
+
+    fclose(file);
+    used_memory = (total_memory + shared_memory - free_memory - buffers -
+                   cached - claim_memory) /
+                  1024;
+
+    file = popen("df -h /", "r");
+    char used[16];
+    while (fgets(buffer, sizeof(buffer), file)) {
+      if (strncmp(buffer, "Filesystem", 10) == 0)
+        continue;
+      sscanf(buffer, "%*s %*s %s %*s %*s %*s", used);
+    }
+    pclose(file);
+
+    file = fopen("/proc/stat", "r");
+    fgets(buffer, sizeof(buffer), file);
+    sscanf(buffer, "%*s %u %u %u %u %u %u %u", &user1, &nice1, &system1, &idle1,
+           &lowait1, &irq1, &softirq1);
+    fclose(file);
+    usleep(1000000);
+    file = fopen("/proc/stat", "r");
+    fgets(buffer, sizeof(buffer), file);
+    sscanf(buffer, "%*s %u %u %u %u %u %u %u", &user2, &nice2, &system2, &idle2,
+           &lowait2, &irq2, &softirq2);
+    fclose(file);
+
+    unsigned long od, nd;
+    double cpu_use = 0;
+
+    od =
+        (unsigned long)(user1 + nice1 + system1 + idle1 + lowait1 + irq1 +
+                        softirq1); // 第一次(用户+优先级+系统+空闲)的时间再赋给od
+    nd =
+        (unsigned long)(user2 + nice2 + system2 + idle2 + lowait2 + irq2 +
+                        softirq2); // 第二次(用户+优先级+系统+空闲)的时间再赋给od
+    double sum = nd - od;
+    double idle = idle2 - idle1;
+    cpu_use = idle / sum;
+    idle = user2 + system2 + nice2 - user1 - system1 - nice1;
+    cpu_use = idle * 100 / sum;
+
+    snprintf(stext, sizeof(stext),
+             "  %.1f 󰔏 %d󰔄 ^b#f5a97f^ 󰋊 ^d^ %s ^b#a6da95^   ^d^ %ldMB ^b#ee99a0^ %s ^d^ %d ", cpu_use,
+             temp / 1000, used, used_memory, bat_icon, batteryLevel);
+    drawbars();
+  }
 }
 
 void run(void) {
   XEvent ev;
-  file = fopen("/home/lobakkang/lol.txt", "w");
-  /* main event loop */
   XSync(dpy, False);
   pthread_create(&thread, NULL, myFunction, (void *)0);
   while (running && !XNextEvent(dpy, &ev)) {
     if (handler[ev.type])
       handler[ev.type](&ev); /* call handler */
   }
-  fprintf(file, "ending\n");
-  fflush(file);
   thread_state = 1;
   pthread_join(thread, NULL);
-  fclose(file);
 }
 
 void scan(void) {
