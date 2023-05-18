@@ -2,7 +2,7 @@
 #include <X11/XF86keysym.h>
 
 /* appearance */
-static const unsigned int borderpx = 1; /* border pixel of windows */
+static const unsigned int borderpx = 2; /* border pixel of windows */
 static const Gap default_gap        = {.isgap = 1, .realgap = 10, .gappx = 10};
 static const unsigned int snap = 32;    /* snap pixel */
 static const int showbar = 1;           /* 0 means no bar */
@@ -113,7 +113,7 @@ static const Key keys[] = {
      SHCMD("pactl set-sink-mute @DEFAULT_SINK@ toggle")},
 
     {0, XF86XK_MonBrightnessUp, spawn, SHCMD("brightnessctl set 10%+")},
-    {0, XF86XK_MonBrightnessDown, spawn, SHCMD("brightnessctl set 10%-")}
+    {0, XF86XK_MonBrightnessDown, spawn, SHCMD("brightnessctl set 10%-")},
 
 	{ MODKEY,                       XK_minus,  setgaps,        {.i = -5 } },
 	{ MODKEY,                       XK_equal,  setgaps,        {.i = +5 } },
