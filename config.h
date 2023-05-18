@@ -72,6 +72,8 @@ static const char *dmenucmd[] = {"dmenu_run", "-fn", dmenufont, "-nb",
                                  col_gray1,   "-nf", col_gray3, "-sb",
                                  col_cyan,    "-sf", col_gray4, NULL};
 static const char *termcmd[] = {"st", NULL};
+static const char scratchpadname[] = "scratchpad";
+static const char *scratchpadcmd[] = { "st", "-t", scratchpadname, "-g", "120x34", NULL };
 
 static const Key keys[] = {
     /* modifier                     key        function        argument */
@@ -126,6 +128,7 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_equal,  setgaps,        {.i = +5 } },
 	{ MODKEY|ShiftMask,             XK_minus,  setgaps,        {.i = GAP_RESET } },
 	{ MODKEY|ShiftMask,             XK_equal,  setgaps,        {.i = GAP_TOGGLE} },
+	{ MODKEY,                       XK_grave,  togglescratch,  {.v = scratchpadcmd } },
 };
 
 /* button definitions */
