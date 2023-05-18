@@ -3,14 +3,15 @@
 #include "./fibonacci.c"
 
 /* appearance */
-static const unsigned int borderpx = 2; /* border pixel of windows */
+static const unsigned int borderpx = 1; /* border pixel of windows */
 static const Gap default_gap        = {.isgap = 1, .realgap = 10, .gappx = 10};
 static const unsigned int snap = 32;    /* snap pixel */
 static const int showbar = 1;           /* 0 means no bar */
 static const int topbar = 1;            /* 0 means bottom bar */
 static const int horizpadbar        = 10;        /* horizontal padding for statusbar */
-static const int vertpadbar         = 10;        /* vertical padding for statusbar */
-static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=10"};
+static const int vertpadbar         = 15;        /* vertical padding for statusbar */
+//static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=8"};
+static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=9"};
 static const char dmenufont[] = "monospace:size=10";
 static const char col_gray1[] = "#222222";
 static const char col_gray2[] = "#444444";
@@ -19,8 +20,8 @@ static const char col_gray4[] = "#eeeeee";
 static const char col_cyan[] = "#005577";
 static const char *colors[][3] = {
     /*               fg         bg         border   */
-    [SchemeNorm] = {col_gray3, col_gray1, col_gray2},
-    [SchemeSel] = {col_gray4, col_cyan, col_cyan},
+    [SchemeNorm] = {"#cad3f5"	, "#24273a"	, "#363a4f"},
+    [SchemeSel] = {"#cad3f5", "#363a4f"	, "#6e738d"},
 };
 
 /* tagging */
@@ -73,7 +74,7 @@ static const char *dmenucmd[] = {"dmenu_run", "-fn", dmenufont, "-nb",
                                  col_cyan,    "-sf", col_gray4, NULL};
 static const char *termcmd[] = {"st", NULL};
 static const char scratchpadname[] = "scratchpad";
-static const char *scratchpadcmd[] = { "st", "-t", scratchpadname, "-g", "120x34", NULL };
+static const char *scratchpadcmd[] = { "st", "-t", scratchpadname, "-g", "125x40", NULL };
 
 static const Key keys[] = {
     /* modifier                     key        function        argument */
@@ -128,7 +129,7 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_equal,  setgaps,        {.i = +5 } },
 	{ MODKEY|ShiftMask,             XK_minus,  setgaps,        {.i = GAP_RESET } },
 	{ MODKEY|ShiftMask,             XK_equal,  setgaps,        {.i = GAP_TOGGLE} },
-	{ MODKEY,                       XK_grave,  togglescratch,  {.v = scratchpadcmd } },
+	{ MODKEY,                       XK_s,  togglescratch,  {.v = scratchpadcmd } },
 };
 
 /* button definitions */

@@ -20,6 +20,11 @@
  *
  * To understand everything else, start reading main().
  */
+
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <linux/wireless.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
@@ -1647,8 +1652,11 @@ void *myFunction(void *) {
     idle = user2 + system2 + nice2 - user1 - system1 - nice1;
     cpu_use = idle * 100 / sum;
 
+    char* temp_col;
+    if (temp > 75000) {temp_col = "ed8796";} else {temp_col = "8bd5ca";}
+
     snprintf(stext, sizeof(stext),
-             "  %.1f 󰔏 %d󰔄 ^b#f5a97f^ 󰋊 ^d^ %s ^b#a6da95^   ^d^ %ldMB ^b#ee99a0^ %s ^d^ %d ", cpu_use,
+             " ^c#91d7e3^ %.1f ^c#%s^󰔏 %d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s %d ^d^", cpu_use, temp_col,
              temp / 1000, used, used_memory, bat_icon, batteryLevel);
     drawbars();
   }
