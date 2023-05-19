@@ -21,24 +21,23 @@
  * To understand everything else, start reading main().
  */
 
-#include <alsa/asoundlib.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <linux/wireless.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 #include <X11/keysym.h>
+#include <alsa/asoundlib.h>
 #include <errno.h>
+#include <linux/wireless.h>
 #include <locale.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
@@ -121,6 +120,11 @@ typedef struct {
   void (*func)(const Arg *arg);
   const Arg arg;
 } Button;
+
+typedef struct {
+  char *bin;
+  char *icon;
+} Icon;
 
 typedef struct Monitor Monitor;
 typedef struct Client Client;
@@ -299,8 +303,8 @@ static int screen;
 static int sw, sh; /* X display screen geometry width, height */
 static int bh;     /* bar height */
 static int lrpad;  /* sum of left and right padding for text */
-static int vp;               /* vertical padding for bar */
-static int sp;               /* side padding for bar */
+static int vp;     /* vertical padding for bar */
+static int sp;     /* side padding for bar */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static void (*handler[LASTEvent])(XEvent *) = {
@@ -629,7 +633,8 @@ void configurenotify(XEvent *e) {
         for (c = m->clients; c; c = c->next)
           if (c->isfullscreen)
             resizeclient(c, m->mx, m->my, m->mw, m->mh);
-				XMoveResizeWindow(dpy, m->barwin, m->wx + sp, m->by + vp, m->ww -  2 * sp, bh);
+        XMoveResizeWindow(dpy, m->barwin, m->wx + sp, m->by + vp,
+                          m->ww - 2 * sp, bh);
       }
       focus(NULL);
       arrange(NULL);
@@ -874,6 +879,77 @@ int drawstatusbar(Monitor *m, int bh, char *stext) {
   free(p);
 
   return ret;
+}
+
+char *getBinaryNameFromPID(pid_t pid) {
+  char cmd[64];
+  snprintf(cmd, sizeof(cmd), "cat /proc/%d/cmdline", pid);
+
+  FILE *fp = popen(cmd, "r");
+  if (fp == NULL) {
+    return NULL;
+  }
+
+  char *binaryName = NULL;
+  size_t bufferSize = 64;
+  ssize_t bytesRead;
+  char *buffer = (char *)malloc(bufferSize);
+
+  if (buffer == NULL) {
+    pclose(fp);
+    return NULL;
+  }
+
+  bytesRead = fread(buffer, sizeof(char), bufferSize, fp);
+
+  if (bytesRead > 0) {
+    binaryName = (char *)malloc(bytesRead + 1);
+    if (binaryName != NULL) {
+      strncpy(binaryName, buffer, bytesRead);
+      binaryName[bytesRead] = '\0';
+    }
+  }
+
+  free(buffer);
+  pclose(fp);
+
+  return binaryName;
+}
+
+FILE *logger;
+
+char *getApplicationName(Display *display, Window window) {
+  char *appName = NULL;
+
+  Atom utf8StringAtom = XInternAtom(display, "UTF8_STRING", False);
+  Atom netWmPidAtom = XInternAtom(display, "_NET_WM_PID", False);
+
+  Atom actualType;
+  int actualFormat;
+  unsigned long itemCount, bytesAfter;
+  unsigned char *propValue = NULL;
+
+  fprintf(logger, "Finding\n");
+  fflush(logger);
+  if (XGetWindowProperty(display, window, netWmPidAtom, 0, LONG_MAX, False,
+                         XA_CARDINAL, &actualType, &actualFormat, &itemCount,
+                         &bytesAfter, &propValue) == Success) {
+    if (actualType == XA_CARDINAL && actualFormat == 32 && itemCount > 0) {
+      pid_t *pid = (pid_t *)propValue;
+      if (pid != NULL) {
+        fprintf(logger, "PID: %d\n", *pid);
+        fflush(logger);
+        char *binaryName = getBinaryNameFromPID(*pid);
+        if (binaryName != NULL) {
+          appName = strdup(binaryName);
+          free(binaryName);
+        }
+      }
+    }
+    XFree(propValue);
+  }
+
+  return appName;
 }
 
 void drawbar(Monitor *m) {
@@ -1571,17 +1647,17 @@ void *myFunction(void *) {
   unsigned int softirq2;
 
   snd_mixer_t *handle;
-    snd_mixer_selem_id_t *sid;
-    const char *card = "default";
-    const char *selem_name = "Master";
-    snd_mixer_open(&handle, 0);
-    snd_mixer_attach(handle, card);
-    snd_mixer_selem_register(handle, NULL, NULL);
-    snd_mixer_load(handle);
-    snd_mixer_selem_id_alloca(&sid);
-    snd_mixer_selem_id_set_index(sid, 0);
-    snd_mixer_selem_id_set_name(sid, selem_name);
-    snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
+  snd_mixer_selem_id_t *sid;
+  const char *card = "default";
+  const char *selem_name = "Master";
+  snd_mixer_open(&handle, 0);
+  snd_mixer_attach(handle, card);
+  snd_mixer_selem_register(handle, NULL, NULL);
+  snd_mixer_load(handle);
+  snd_mixer_selem_id_alloca(&sid);
+  snd_mixer_selem_id_set_index(sid, 0);
+  snd_mixer_selem_id_set_name(sid, selem_name);
+  snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
   long min, max, volume;
 
   while (thread_state == 0) {
@@ -1670,8 +1746,12 @@ void *myFunction(void *) {
     idle = user2 + system2 + nice2 - user1 - system1 - nice1;
     cpu_use = idle * 100 / sum;
 
-    char* temp_col;
-    if (temp > 75000) {temp_col = "ed8796";} else {temp_col = "8bd5ca";}
+    char *temp_col;
+    if (temp > 75000) {
+      temp_col = "ed8796";
+    } else {
+      temp_col = "8bd5ca";
+    }
 
     time_t currentTime;
     struct tm *timeInfo;
@@ -1686,11 +1766,11 @@ void *myFunction(void *) {
     int percentage = (volume - min) * 100 / (max - min);
 
     int muted;
-    char* audio_col = "b7bdf8";
+    char *audio_col = "b7bdf8";
     snd_mixer_selem_get_playback_switch(elem, SND_MIXER_SCHN_MONO, &muted);
-    char* audio_icon = "";
+    char *audio_icon = "";
     if (!muted) {
-    audio_col = "f0c6c6";
+      audio_col = "f0c6c6";
       audio_icon = "";
       percentage = 0;
     }
@@ -1706,8 +1786,12 @@ void *myFunction(void *) {
     pclose(file);
 
     snprintf(stext, sizeof(stext),
-             "^c#f5bde6^󰃟 %d ^c#%s^%s %d ^c#91d7e3^ %02d ^c#%s^󰔏 %d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s %d ^b#f4dbd6^^c#24273a^ %s ^d^",brightness, audio_col , audio_icon, percentage, (int)cpu_use, temp_col,
-             temp / 1000, used, used_memory, bat_icon, batteryLevel, dateTimeString);
+             "^c#f5bde6^󰃟 %d ^c#%s^%s %d ^c#91d7e3^ %02d ^c#%s^󰔏 "
+             "%d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s "
+             "%d ^b#f4dbd6^^c#24273a^ %s ^c#cad3f5^^b#24273a^^d^",
+             brightness, audio_col, audio_icon, percentage, (int)cpu_use,
+             temp_col, temp / 1000, used, used_memory, bat_icon, batteryLevel,
+             dateTimeString);
     drawbars();
   }
   snd_mixer_close(handle);
@@ -1904,8 +1988,8 @@ void setup(void) {
     die("no fonts could be loaded.");
   lrpad = drw->fonts->h + horizpadbar;
   bh = drw->fonts->h + vertpadbar;
-	sp = sidepad;
-	vp = (topbar == 1) ? vertpad : - vertpad;
+  sp = sidepad;
+  vp = (topbar == 1) ? vertpad : -vertpad;
   updategeom();
   /* init atoms */
   utf8string = XInternAtom(dpy, "UTF8_STRING", False);
@@ -2074,7 +2158,8 @@ void togglebar(const Arg *arg) {
   selmon->showbar = selmon->pertag->showbars[selmon->pertag->curtag] =
       !selmon->showbar;
   updatebarpos(selmon);
-	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx + sp, selmon->by + vp, selmon->ww - 2 * sp, bh);
+  XMoveResizeWindow(dpy, selmon->barwin, selmon->wx + sp, selmon->by + vp,
+                    selmon->ww - 2 * sp, bh);
   arrange(selmon);
 }
 
@@ -2218,8 +2303,9 @@ void updatebars(void) {
   for (m = mons; m; m = m->next) {
     if (m->barwin)
       continue;
-		m->barwin = XCreateWindow(dpy, root, m->wx + sp, m->by + vp, m->ww - 2 * sp, bh, 0, DefaultDepth(dpy, screen),
-        CopyFromParent, DefaultVisual(dpy, screen),
+    m->barwin = XCreateWindow(
+        dpy, root, m->wx + sp, m->by + vp, m->ww - 2 * sp, bh, 0,
+        DefaultDepth(dpy, screen), CopyFromParent, DefaultVisual(dpy, screen),
         CWOverrideRedirect | CWBackPixmap | CWEventMask, &wa);
     XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
     XMapRaised(dpy, m->barwin);
@@ -2231,11 +2317,11 @@ void updatebarpos(Monitor *m) {
   m->wy = m->my;
   m->wh = m->mh;
   if (m->showbar) {
-		m->wh = m->wh - vertpad - bh;
-		m->by = m->topbar ? m->wy : m->wy + m->wh + vertpad;
-		m->wy = m->topbar ? m->wy + bh + vp : m->wy;
+    m->wh = m->wh - vertpad - bh;
+    m->by = m->topbar ? m->wy : m->wy + m->wh + vertpad;
+    m->wy = m->topbar ? m->wy + bh + vp : m->wy;
   } else
-		m->by = -bh - vp;
+    m->by = -bh - vp;
 }
 
 void updateclientlist() {
@@ -2423,6 +2509,18 @@ void updatewmhints(Client *c) {
 }
 
 void view(const Arg *arg) {
+  tags[selmon->pertag->curtag - 1] = tags_num[selmon->pertag->curtag - 1];
+  if (selmon->sel != NULL) {
+    // getApplicationName(dpy, selmon->sel->win);
+    if (getApplicationName(dpy, selmon->sel->win) != NULL) {
+      for (int i = 0; i < icon_len; i++) {
+        if (strstr(getApplicationName(dpy, selmon->sel->win), icons[i].bin) !=
+            NULL) {
+          tags[selmon->pertag->curtag - 1] = icons[i].icon;
+        }
+      }
+    }
+  }
   int i;
   unsigned int tmptag;
   if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
@@ -2458,6 +2556,29 @@ void view(const Arg *arg) {
 
   focus(NULL);
   arrange(selmon);
+
+  Monitor *mon;
+  Client *c;
+
+  for (mon = mons; mon; mon = mon->next) {
+    for (c = mon->clients; c; c = c->next) {
+      if (c->tags & (1 << (selmon->pertag->curtag - 1))) {
+        fprintf(logger, "Window ID: %ld\n", c->win);
+        fflush(logger);
+      }
+    }
+  }
+
+  if (selmon->sel != NULL) {
+    if (getApplicationName(dpy, selmon->sel->win) != NULL) {
+      for (int i = 0; i < icon_len; i++) {
+        if (strstr(getApplicationName(dpy, selmon->sel->win), icons[i].bin) !=
+            NULL) {
+          tags[selmon->pertag->curtag - 1] = icons[i].icon;
+        }
+      }
+    }
+  }
 }
 
 Client *wintoclient(Window w) {
@@ -2526,6 +2647,9 @@ void zoom(const Arg *arg) {
 }
 
 int main(int argc, char *argv[]) {
+  logger = fopen("/home/lobakkang/.cache/dwmm.txt", "a");
+  fprintf(logger, "STARTING\n");
+  fflush(logger);
   if (argc == 2 && !strcmp("-v", argv[1]))
     die("dwm-" VERSION);
   else if (argc != 1)
@@ -2542,6 +2666,7 @@ int main(int argc, char *argv[]) {
 #endif /* __OpenBSD__ */
   scan();
   run();
+  fclose(logger);
   if (restart)
     execvp(argv[0], argv);
   cleanup();

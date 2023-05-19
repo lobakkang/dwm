@@ -28,7 +28,8 @@ static const char *colors[][3] = {
 };
 
 /* tagging */
-static const char *tags[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
+static char *tags_num[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
+static char *tags[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
 static const Rule rules[] = {
     /* xprop(1):
@@ -57,6 +58,12 @@ static const Layout layouts[] = {
  	{ "[\\]",      dwindle },
 };
 
+static Icon icons[] = {
+  {.bin = "st", .icon=""},
+  {.bin = "chrome", .icon=""}
+};
+static int icon_len = 2;
+
 /* key definitions */
 #define MODKEY Mod4Mask
 #define TAGKEYS(KEY, TAG)                                                      \
@@ -78,6 +85,8 @@ static const char *dmenucmd[] = {"dmenu_run", "-fn", dmenufont, "-nb",
 static const char *termcmd[] = {"st", NULL};
 static const char scratchpadname[] = "scratchpad";
 static const char *scratchpadcmd[] = { "st", "-t", scratchpadname, "-g", "125x40", NULL };
+
+
 
 static const Key keys[] = {
     /* modifier                     key        function        argument */
