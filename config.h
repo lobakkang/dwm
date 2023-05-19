@@ -3,11 +3,14 @@
 #include "./fibonacci.c"
 
 /* appearance */
-static const unsigned int borderpx = 1; /* border pixel of windows */
+static int volume = 100;
+static const unsigned int borderpx = 3; /* border pixel of windows */
 static const Gap default_gap        = {.isgap = 1, .realgap = 10, .gappx = 10};
 static const unsigned int snap = 32;    /* snap pixel */
 static const int showbar = 1;           /* 0 means no bar */
 static const int topbar = 1;            /* 0 means bottom bar */
+static int vertpad            = 10;       /* vertical padding of bar */
+static int sidepad            = 10;       /* horizontal padding of bar */
 static const int horizpadbar        = 10;        /* horizontal padding for statusbar */
 static const int vertpadbar         = 15;        /* vertical padding for statusbar */
 //static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=8"};
@@ -21,7 +24,7 @@ static const char col_cyan[] = "#005577";
 static const char *colors[][3] = {
     /*               fg         bg         border   */
     [SchemeNorm] = {"#cad3f5"	, "#24273a"	, "#363a4f"},
-    [SchemeSel] = {"#cad3f5", "#363a4f"	, "#6e738d"},
+    [SchemeSel] = {"#cad3f5", "#363a4f"	, "#8bd5ca"},
 };
 
 /* tagging */
@@ -116,9 +119,9 @@ static const Key keys[] = {
     {MODKEY | ControlMask | ShiftMask, XK_q, quit, {1}},
 
     {0, XF86XK_AudioLowerVolume, spawn,
-     SHCMD("pactl set-sink-volume @DEFAULT_SINK@ -5%")},
+     SHCMD("/home/lobakkang/.config/status2d/vol_down.sh")},
     {0, XF86XK_AudioRaiseVolume, spawn,
-     SHCMD("pactl set-sink-volume @DEFAULT_SINK@ +5%")},
+     SHCMD("/home/lobakkang/.config/status2d/vol_up.sh")},
     {0, XF86XK_AudioMute, spawn,
      SHCMD("pactl set-sink-mute @DEFAULT_SINK@ toggle")},
 

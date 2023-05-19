@@ -21,6 +21,7 @@
  * To understand everything else, start reading main().
  */
 
+#include <alsa/asoundlib.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -298,6 +299,8 @@ static int screen;
 static int sw, sh; /* X display screen geometry width, height */
 static int bh;     /* bar height */
 static int lrpad;  /* sum of left and right padding for text */
+static int vp;               /* vertical padding for bar */
+static int sp;               /* side padding for bar */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static void (*handler[LASTEvent])(XEvent *) = {
@@ -626,7 +629,7 @@ void configurenotify(XEvent *e) {
         for (c = m->clients; c; c = c->next)
           if (c->isfullscreen)
             resizeclient(c, m->mx, m->my, m->mw, m->mh);
-        XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+				XMoveResizeWindow(dpy, m->barwin, m->wx + sp, m->by + vp, m->ww -  2 * sp, bh);
       }
       focus(NULL);
       arrange(NULL);
@@ -801,7 +804,7 @@ int drawstatusbar(Monitor *m, int bh, char *stext) {
   text = p;
 
   w += 2; /* 1px padding on both sides */
-  ret = x = m->ww - w;
+  ret = x = m->ww - w - sp - horizpadbar;
 
   drw_setscheme(drw, scheme[LENGTH(colors)]);
   drw->scheme[ColFg] = scheme[SchemeNorm][ColFg];
@@ -1566,6 +1569,21 @@ void *myFunction(void *) {
   unsigned int lowait2;
   unsigned int irq2;
   unsigned int softirq2;
+
+  snd_mixer_t *handle;
+    snd_mixer_selem_id_t *sid;
+    const char *card = "default";
+    const char *selem_name = "Master";
+    snd_mixer_open(&handle, 0);
+    snd_mixer_attach(handle, card);
+    snd_mixer_selem_register(handle, NULL, NULL);
+    snd_mixer_load(handle);
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+    snd_mixer_selem_id_set_name(sid, selem_name);
+    snd_mixer_elem_t *elem = snd_mixer_find_selem(handle, sid);
+  long min, max, volume;
+
   while (thread_state == 0) {
     FILE *file = fopen(BAT_LEVEL_PATH, "r");
     fscanf(file, "%d", &batteryLevel);
@@ -1630,7 +1648,7 @@ void *myFunction(void *) {
     sscanf(buffer, "%*s %u %u %u %u %u %u %u", &user1, &nice1, &system1, &idle1,
            &lowait1, &irq1, &softirq1);
     fclose(file);
-    usleep(1000000);
+    usleep(200000);
     file = fopen("/proc/stat", "r");
     fgets(buffer, sizeof(buffer), file);
     sscanf(buffer, "%*s %u %u %u %u %u %u %u", &user2, &nice2, &system2, &idle2,
@@ -1655,11 +1673,44 @@ void *myFunction(void *) {
     char* temp_col;
     if (temp > 75000) {temp_col = "ed8796";} else {temp_col = "8bd5ca";}
 
+    time_t currentTime;
+    struct tm *timeInfo;
+    char dateTimeString[20];
+    time(&currentTime);
+    timeInfo = localtime(&currentTime);
+    strftime(dateTimeString, 20, "%B %d, %I:%M %p", timeInfo);
+
+    snd_mixer_handle_events(handle);
+    snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
+    snd_mixer_selem_get_playback_volume(elem, SND_MIXER_SCHN_MONO, &volume);
+    int percentage = (volume - min) * 100 / (max - min);
+
+    int muted;
+    char* audio_col = "b7bdf8";
+    snd_mixer_selem_get_playback_switch(elem, SND_MIXER_SCHN_MONO, &muted);
+    char* audio_icon = "";
+    if (!muted) {
+    audio_col = "f0c6c6";
+      audio_icon = "";
+      percentage = 0;
+    }
+    percentage = percentage + (5 - (percentage % 5)) % 5;
+
+    int brightness = 0;
+    file = popen("brightnessctl get", "r");
+    fgets(buffer, sizeof(buffer), file);
+    sscanf(buffer, "%d", &brightness);
+    brightness = brightness * 100 / 255;
+    brightness = brightness + (10 - (brightness % 10)) % 10;
+
+    pclose(file);
+
     snprintf(stext, sizeof(stext),
-             " ^c#91d7e3^ %.1f ^c#%s^󰔏 %d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s %d ^d^", cpu_use, temp_col,
-             temp / 1000, used, used_memory, bat_icon, batteryLevel);
+             "^c#f5bde6^󰃟 %d ^c#%s^%s %d ^c#91d7e3^ %02d ^c#%s^󰔏 %d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s %d ^b#f4dbd6^^c#24273a^ %s ^d^",brightness, audio_col , audio_icon, percentage, (int)cpu_use, temp_col,
+             temp / 1000, used, used_memory, bat_icon, batteryLevel, dateTimeString);
     drawbars();
   }
+  snd_mixer_close(handle);
 }
 
 void run(void) {
@@ -1853,6 +1904,8 @@ void setup(void) {
     die("no fonts could be loaded.");
   lrpad = drw->fonts->h + horizpadbar;
   bh = drw->fonts->h + vertpadbar;
+	sp = sidepad;
+	vp = (topbar == 1) ? vertpad : - vertpad;
   updategeom();
   /* init atoms */
   utf8string = XInternAtom(dpy, "UTF8_STRING", False);
@@ -2021,8 +2074,7 @@ void togglebar(const Arg *arg) {
   selmon->showbar = selmon->pertag->showbars[selmon->pertag->curtag] =
       !selmon->showbar;
   updatebarpos(selmon);
-  XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww,
-                    bh);
+	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx + sp, selmon->by + vp, selmon->ww - 2 * sp, bh);
   arrange(selmon);
 }
 
@@ -2166,8 +2218,7 @@ void updatebars(void) {
   for (m = mons; m; m = m->next) {
     if (m->barwin)
       continue;
-    m->barwin = XCreateWindow(
-        dpy, root, m->wx, m->by, m->ww, bh, 0, DefaultDepth(dpy, screen),
+		m->barwin = XCreateWindow(dpy, root, m->wx + sp, m->by + vp, m->ww - 2 * sp, bh, 0, DefaultDepth(dpy, screen),
         CopyFromParent, DefaultVisual(dpy, screen),
         CWOverrideRedirect | CWBackPixmap | CWEventMask, &wa);
     XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
@@ -2180,11 +2231,11 @@ void updatebarpos(Monitor *m) {
   m->wy = m->my;
   m->wh = m->mh;
   if (m->showbar) {
-    m->wh -= bh;
-    m->by = m->topbar ? m->wy : m->wy + m->wh;
-    m->wy = m->topbar ? m->wy + bh : m->wy;
+		m->wh = m->wh - vertpad - bh;
+		m->by = m->topbar ? m->wy : m->wy + m->wh + vertpad;
+		m->wy = m->topbar ? m->wy + bh + vp : m->wy;
   } else
-    m->by = -bh;
+		m->by = -bh - vp;
 }
 
 void updateclientlist() {
