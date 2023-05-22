@@ -3,7 +3,6 @@
 #include "./fibonacci.c"
 
 /* appearance */
-static int volume = 100;
 static const unsigned int borderpx = 3; /* border pixel of windows */
 static const Gap default_gap        = {.isgap = 1, .realgap = 10, .gappx = 10};
 static const unsigned int snap = 32;    /* snap pixel */
@@ -14,7 +13,7 @@ static int sidepad            = 10;       /* horizontal padding of bar */
 static const int horizpadbar        = 10;        /* horizontal padding for statusbar */
 static const int vertpadbar         = 15;        /* vertical padding for statusbar */
 //static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=8"};
-static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=9"};
+static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=10"};
 static const char dmenufont[] = "monospace:size=10";
 static const char col_gray1[] = "#222222";
 static const char col_gray2[] = "#444444";

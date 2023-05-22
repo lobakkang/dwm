@@ -14,7 +14,7 @@ static int sidepad            = 10;       /* horizontal padding of bar */
 static const int horizpadbar        = 10;        /* horizontal padding for statusbar */
 static const int vertpadbar         = 15;        /* vertical padding for statusbar */
 //static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=8"};
-static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=9"};
+static const char *fonts[] = {"BigBlueTerm437 Nerd Font:size=10"};
 static const char dmenufont[] = "monospace:size=10";
 static const char col_gray1[] = "#222222";
 static const char col_gray2[] = "#444444";

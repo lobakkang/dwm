@@ -929,16 +929,16 @@ char *getApplicationName(Display *display, Window window) {
   unsigned long itemCount, bytesAfter;
   unsigned char *propValue = NULL;
 
-  fprintf(logger, "Finding\n");
-  fflush(logger);
+  //fprintf(logger, "Finding\n");
+  //fflush(logger);
   if (XGetWindowProperty(display, window, netWmPidAtom, 0, LONG_MAX, False,
                          XA_CARDINAL, &actualType, &actualFormat, &itemCount,
                          &bytesAfter, &propValue) == Success) {
     if (actualType == XA_CARDINAL && actualFormat == 32 && itemCount > 0) {
       pid_t *pid = (pid_t *)propValue;
       if (pid != NULL) {
-        fprintf(logger, "PID: %d\n", *pid);
-        fflush(logger);
+        //fprintf(logger, "PID: %d\n", *pid);
+        //fflush(logger);
         char *binaryName = getBinaryNameFromPID(*pid);
         if (binaryName != NULL) {
           appName = strdup(binaryName);
@@ -1788,7 +1788,7 @@ void *myFunction(void *) {
     snprintf(stext, sizeof(stext),
              "^c#f5bde6^󰃟 %d ^c#%s^%s %d ^c#91d7e3^ %02d ^c#%s^󰔏 "
              "%d󰔄^c#f5a97f^ 󰋊 %s^d^^c#a6da95^  %ldMB^d^^c#ee99a0^ %s "
-             "%d ^b#f4dbd6^^c#24273a^ %s ^c#cad3f5^^b#24273a^^d^",
+             "%d ^c#f4dbd6^ %s ^c#cad3f5^^b#24273a^^d^",
              brightness, audio_col, audio_icon, percentage, (int)cpu_use,
              temp_col, temp / 1000, used, used_memory, bat_icon, batteryLevel,
              dateTimeString);
@@ -2509,18 +2509,6 @@ void updatewmhints(Client *c) {
 }
 
 void view(const Arg *arg) {
-  tags[selmon->pertag->curtag - 1] = tags_num[selmon->pertag->curtag - 1];
-  if (selmon->sel != NULL) {
-    // getApplicationName(dpy, selmon->sel->win);
-    if (getApplicationName(dpy, selmon->sel->win) != NULL) {
-      for (int i = 0; i < icon_len; i++) {
-        if (strstr(getApplicationName(dpy, selmon->sel->win), icons[i].bin) !=
-            NULL) {
-          tags[selmon->pertag->curtag - 1] = icons[i].icon;
-        }
-      }
-    }
-  }
   int i;
   unsigned int tmptag;
   if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
@@ -2560,23 +2548,23 @@ void view(const Arg *arg) {
   Monitor *mon;
   Client *c;
 
+  for (int i = 0; i < 9; i++) {
+    tags[i] = tags_num[i];
+  }
   for (mon = mons; mon; mon = mon->next) {
     for (c = mon->clients; c; c = c->next) {
-      if (c->tags & (1 << (selmon->pertag->curtag - 1))) {
-        fprintf(logger, "Window ID: %ld\n", c->win);
-        fflush(logger);
+      unsigned int tagNumber = 0;
+      int tag = c->tags;
+      while (tag >>= 1) {
+        tagNumber++;
       }
-    }
-  }
-
-  if (selmon->sel != NULL) {
-    if (getApplicationName(dpy, selmon->sel->win) != NULL) {
       for (int i = 0; i < icon_len; i++) {
-        if (strstr(getApplicationName(dpy, selmon->sel->win), icons[i].bin) !=
-            NULL) {
-          tags[selmon->pertag->curtag - 1] = icons[i].icon;
+        if (strstr(getApplicationName(dpy, c->win), icons[i].bin) != NULL) {
+          tags[tagNumber] = icons[i].icon;
         }
       }
+      //fprintf(logger, "Tag %d: Window ID %lu\n", tagNumber, c->win);
+      //fflush(logger);
     }
   }
 }
